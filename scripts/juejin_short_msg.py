@@ -10,6 +10,7 @@
 
 from typing import Any, List, Optional
 
+import os
 import requests
 
 from scripts.juejin_collect import (
@@ -162,10 +163,7 @@ def comment_short_msg(
 ) -> bool:
     """
     评论一条沸点（需要登录）。
-    :param cookies_str: 完整 Cookie 字符串
-    :param msg_id: 沸点 msg_id（即 item_id）
-    :param comment_content: 评论内容
-    :return: 是否成功
+    若接口返回空/非 JSON，可设置环境变量 JUEJIN_CSRF_TOKEN（从浏览器请求头 x-secsdk-csrf-token 复制）后重试。
     """
     cookies_str = _sanitize_cookie_header(cookies_str)
     uuid = _extract_uuid(cookies_str)
@@ -179,6 +177,9 @@ def comment_short_msg(
         "comment_pics": [],
     }
     headers = {**_default_headers(), "Cookie": cookies_str}
+    csrf = (os.getenv("JUEJIN_CSRF_TOKEN") or "").strip()
+    if csrf:
+        headers["x-secsdk-csrf-token"] = csrf
     try:
         resp = requests.post(
             url,
@@ -188,8 +189,19 @@ def comment_short_msg(
             timeout=10,
         )
         resp.raise_for_status()
-        data = resp.json()
+        text = (resp.text or "").strip()
+        if not text:
+            print(f"❌ 评论沸点失败 {msg_id}: 接口返回空（Cookie 可能过期或风控）")
+            return False
+        try:
+            data = resp.json()
+        except ValueError:
+            print(f"❌ 评论沸点失败 {msg_id}: 接口返回非 JSON，status={resp.status_code} body={text[:100]!r}")
+            return False
         return data.get("err_no") == 0
+    except requests.exceptions.HTTPError as e:
+        print(f"❌ 评论沸点失败 {msg_id}: HTTP {e.response.status_code if e.response else ''} {e}")
+        return False
     except Exception as e:
         print(f"❌ 评论沸点失败 {msg_id}: {e}")
         return False
