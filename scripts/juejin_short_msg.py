@@ -163,12 +163,18 @@ def comment_short_msg(
 ) -> bool:
     """
     评论一条沸点（需要登录）。
-    若接口返回空/非 JSON，可设置环境变量 JUEJIN_CSRF_TOKEN（从浏览器请求头 x-secsdk-csrf-token 复制）后重试。
+    若接口返回空，需同时提供 JUEJIN_CSRF_TOKEN、JUEJIN_MS_TOKEN、JUEJIN_A_BOGUS（从浏览器评论请求的 URL 与请求头复制）。
     """
     cookies_str = _sanitize_cookie_header(cookies_str)
     uuid = _extract_uuid(cookies_str)
     url = f"{BASE_URL}/interact_api/v1/comment/publish"
     params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
+    ms_token = (os.getenv("JUEJIN_MS_TOKEN") or "").strip()
+    a_bogus = (os.getenv("JUEJIN_A_BOGUS") or "").strip()
+    if ms_token:
+        params["msToken"] = ms_token
+    if a_bogus:
+        params["a_bogus"] = a_bogus
     payload = {
         "client_type": 2608,
         "item_id": msg_id,

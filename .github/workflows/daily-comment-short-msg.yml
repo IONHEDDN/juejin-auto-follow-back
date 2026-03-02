@@ -27,3 +27,5 @@ jobs:
           PYTHONUNBUFFERED: '1'
           JUEJIN_COOKIES: ${{ secrets.JUEJIN_COOKIES }}
           JUEJIN_CSRF_TOKEN: ${{ secrets.JUEJIN_CSRF_TOKEN }}
+          JUEJIN_MS_TOKEN: ${{ secrets.JUEJIN_MS_TOKEN }}
+          JUEJIN_A_BOGUS: ${{ secrets.JUEJIN_A_BOGUS }}
