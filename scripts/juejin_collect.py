@@ -258,38 +258,22 @@ def comment_article(cookies_str: str, item_id: str, comment_content: str) -> boo
     评论一篇文章（需要登录）。
     若接口返回空，需同时提供：JUEJIN_CSRF_TOKEN、JUEJIN_MS_TOKEN、JUEJIN_A_BOGUS（从浏览器评论请求的 URL 与请求头复制）。
     """
-    return comment_article_return_id(cookies_str, item_id, comment_content) is not None
-
-
-def comment_article_return_id(
-    cookies_str: str,
-    item_id: str,
-    comment_content: str,
-    *,
-    ms_token: Optional[str] = None,
-    a_bogus: Optional[str] = None,
-    csrf_token: Optional[str] = None,
-) -> Optional[str]:
-    """
-    评论一篇文章（需要登录），成功返回 comment_id，失败返回 None。
-    若传 ms_token/a_bogus/csrf_token 则优先使用（用于写死 token）；否则从环境变量读取。
-    """
     cookies_str = _sanitize_cookie_header(cookies_str)
     uuid = _extract_uuid(cookies_str)
     url = f"{BASE_URL}/interact_api/v1/comment/publish"
     params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
-    ms = (ms_token or os.getenv("JUEJIN_MS_TOKEN") or "").strip()
-    ab = (a_bogus or os.getenv("JUEJIN_A_BOGUS") or "").strip()
-    if ms:
+    ms_token = (os.getenv("JUEJIN_MS_TOKEN") or "").strip()
+    a_bogus = (os.getenv("JUEJIN_A_BOGUS") or "").strip()
+    if ms_token:
         try:
-            params["msToken"] = urllib.parse.unquote(ms)
+            params["msToken"] = urllib.parse.unquote(ms_token)
         except Exception:
-            params["msToken"] = ms
-    if ab:
+            params["msToken"] = ms_token
+    if a_bogus:
         try:
-            params["a_bogus"] = urllib.parse.unquote(ab)
+            params["a_bogus"] = urllib.parse.unquote(a_bogus)
         except Exception:
-            params["a_bogus"] = ab
+            params["a_bogus"] = a_bogus
     payload = {
         "client_type": 2608,
         "item_id": item_id,
@@ -298,7 +282,7 @@ def comment_article_return_id(
         "comment_pics": [],
     }
     headers = {**_default_headers(), "Cookie": cookies_str}
-    csrf = (csrf_token or os.getenv("JUEJIN_CSRF_TOKEN") or "").strip()
+    csrf = (os.getenv("JUEJIN_CSRF_TOKEN") or "").strip()
     if csrf:
         headers["x-secsdk-csrf-token"] = csrf
     try:
@@ -313,68 +297,21 @@ def comment_article_return_id(
         text = (resp.text or "").strip()
         if not text:
             has_csrf = "是" if csrf else "否"
-            has_ms = "是" if ms else "否"
-            has_ab = "是" if ab else "否"
+            has_ms = "是" if ms_token else "否"
+            has_ab = "是" if a_bogus else "否"
             print(f"❌ 评论文章失败 {item_id}: 接口返回空 | 已带 CSRF: {has_csrf}, msToken: {has_ms}, a_bogus: {has_ab}（若均为是仍失败，多半为 msToken/a_bogus 已过期，请从浏览器评论请求 URL 重新复制）")
-            return None
+            return False
         try:
             data = resp.json()
         except ValueError:
             print(f"❌ 评论文章失败 {item_id}: 接口返回非 JSON，status={resp.status_code} body={text[:100]!r}")
-            return None
-        if data.get("err_no") != 0:
-            return None
-        info = (data.get("data") or {}).get("comment_info") or data.get("data")
-        if isinstance(info, dict) and info.get("comment_id"):
-            return str(info["comment_id"])
-        return str((data.get("data") or {}).get("comment_id") or "")
-    except requests.exceptions.HTTPError as e:
-        print(f"❌ 评论文章失败 {item_id}: HTTP {e.response.status_code if e.response else ''} {e}")
-        return None
-    except Exception as e:
-        print(f"❌ 评论文章失败 {item_id}: {e}")
-        return None
-
-
-def delete_comment(
-    cookies_str: str,
-    comment_id: str,
-    *,
-    csrf_token: Optional[str] = None,
-) -> bool:
-    """
-    删除一条评论（需要登录）。csrf_token 可传入或从环境变量 JUEJIN_CSRF_TOKEN 读取。
-    """
-    cookies_str = _sanitize_cookie_header(cookies_str)
-    uuid = _extract_uuid(cookies_str)
-    url = f"{BASE_URL}/interact_api/v1/comment/delete"
-    params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
-    payload = {"comment_id": comment_id}
-    headers = {**_default_headers(), "Cookie": cookies_str}
-    csrf = (csrf_token or os.getenv("JUEJIN_CSRF_TOKEN") or "").strip()
-    if csrf:
-        headers["x-secsdk-csrf-token"] = csrf
-    try:
-        resp = requests.post(
-            url,
-            params=params,
-            headers=headers,
-            json=payload,
-            timeout=10,
-        )
-        resp.raise_for_status()
-        text = (resp.text or "").strip()
-        if not text:
-            print(f"❌ 删除评论失败 {comment_id}: 接口返回空")
-            return False
-        try:
-            data = resp.json()
-        except ValueError:
-            print(f"❌ 删除评论失败 {comment_id}: 接口返回非 JSON")
             return False
         return data.get("err_no") == 0
+    except requests.exceptions.HTTPError as e:
+        print(f"❌ 评论文章失败 {item_id}: HTTP {e.response.status_code if e.response else ''} {e}")
+        return False
     except Exception as e:
-        print(f"❌ 删除评论失败 {comment_id}: {e}")
+        print(f"❌ 评论文章失败 {item_id}: {e}")
         return False
 
 
