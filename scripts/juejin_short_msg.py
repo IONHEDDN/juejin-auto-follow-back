@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+掘金沸点（short_msg）原子接口
+- 获取推荐沸点列表（含内容）
+- 点赞沸点（digg）
+- 发布沸点（publish）
+- 评论沸点（comment）
+"""
+
+from typing import Any, List, Optional
+
+import requests
+
+from scripts.juejin_collect import (
+    _default_headers,
+    _extract_uuid,
+    _sanitize_cookie_header,
+)
+
+BASE_URL = "https://api.juejin.cn"
+AID = "2608"
+SPIDER = "0"
+ITEM_TYPE_SHORT_MSG = 4
+
+
+def get_recommend_short_msgs(
+    cookies_str: str,
+    limit: int = 6,
+    cursor: str = "0",
+) -> List[Any]:
+    """
+    获取推荐沸点列表（含 content），用于取某条内容再发沸点等。
+    :param cookies_str: 完整 Cookie 字符串
+    :param limit: 条数
+    :param cursor: 分页游标
+    :return: data 列表，每项含 msg_id、msg_Info.content 等，失败返回 []
+    """
+    cookies_str = _sanitize_cookie_header(cookies_str)
+    uuid = _extract_uuid(cookies_str)
+    url = f"{BASE_URL}/recommend_api/v1/short_msg/recommend"
+    params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
+    payload = {"id_type": 4, "sort_type": 300, "cursor": cursor, "limit": limit}
+    headers = {**_default_headers(), "Cookie": cookies_str}
+    try:
+        resp = requests.post(
+            url,
+            params=params,
+            headers=headers,
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("err_no") != 0:
+            return []
+        return data.get("data") or []
+    except Exception as e:
+        print(f"❌ 获取推荐沸点失败: {e}")
+        return []
+
+
+def get_recommend_short_msg_ids(
+    cookies_str: str,
+    limit: int = 3,
+    cursor: str = "0",
+) -> List[str]:
+    """
+    获取推荐沸点列表的前 limit 条的 msg_id（需要登录）。
+    :param cookies_str: 完整 Cookie 字符串
+    :param limit: 条数
+    :param cursor: 分页游标
+    :return: msg_id 列表，失败返回 []
+    """
+    cookies_str = _sanitize_cookie_header(cookies_str)
+    uuid = _extract_uuid(cookies_str)
+    url = f"{BASE_URL}/recommend_api/v1/short_msg/recommend"
+    params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
+    payload = {"id_type": 4, "sort_type": 300, "cursor": cursor, "limit": limit}
+    headers = {**_default_headers(), "Cookie": cookies_str}
+    try:
+        resp = requests.post(
+            url,
+            params=params,
+            headers=headers,
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("err_no") != 0:
+            return []
+        items = data.get("data") or []
+        return [str(x.get("msg_id", "")) for x in items[:limit] if x.get("msg_id")]
+    except Exception as e:
+        print(f"❌ 获取推荐沸点失败: {e}")
+        return []
+
+
+def publish_short_msg(cookies_str: str, content: str) -> bool:
+    """
+    发布一条沸点（需要登录）。
+    :param cookies_str: 完整 Cookie 字符串
+    :param content: 沸点正文
+    :return: 是否成功
+    """
+    cookies_str = _sanitize_cookie_header(cookies_str)
+    uuid = _extract_uuid(cookies_str)
+    url = f"{BASE_URL}/content_api/v1/short_msg/publish"
+    params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
+    payload = {"content": content, "mentions": [], "sync_to_org": False}
+    headers = {**_default_headers(), "Cookie": cookies_str}
+    try:
+        resp = requests.post(
+            url,
+            params=params,
+            headers=headers,
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("err_no") == 0
+    except Exception as e:
+        print(f"❌ 发布沸点失败: {e}")
+        return False
+
+
+def digg_short_msg(cookies_str: str, msg_id: str) -> bool:
+    """
+    点赞一条沸点（需要登录）。
+    :param cookies_str: 完整 Cookie 字符串
+    :param msg_id: 沸点 msg_id
+    :return: 是否成功
+    """
+    cookies_str = _sanitize_cookie_header(cookies_str)
+    uuid = _extract_uuid(cookies_str)
+    url = f"{BASE_URL}/interact_api/v1/digg/save"
+    params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
+    payload = {"item_id": msg_id, "item_type": ITEM_TYPE_SHORT_MSG, "client_type": 2608}
+    headers = {**_default_headers(), "Cookie": cookies_str}
+    try:
+        resp = requests.post(
+            url,
+            params=params,
+            headers=headers,
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("err_no") == 0
+    except Exception as e:
+        print(f"❌ 点赞沸点失败 {msg_id}: {e}")
+        return False
+
+
+def comment_short_msg(
+    cookies_str: str,
+    msg_id: str,
+    comment_content: str,
+) -> bool:
+    """
+    评论一条沸点（需要登录）。
+    :param cookies_str: 完整 Cookie 字符串
+    :param msg_id: 沸点 msg_id（即 item_id）
+    :param comment_content: 评论内容
+    :return: 是否成功
+    """
+    cookies_str = _sanitize_cookie_header(cookies_str)
+    uuid = _extract_uuid(cookies_str)
+    url = f"{BASE_URL}/interact_api/v1/comment/publish"
+    params = {"aid": AID, "uuid": uuid, "spider": SPIDER}
+    payload = {
+        "client_type": 2608,
+        "item_id": msg_id,
+        "item_type": ITEM_TYPE_SHORT_MSG,
+        "comment_content": comment_content,
+        "comment_pics": [],
+    }
+    headers = {**_default_headers(), "Cookie": cookies_str}
+    try:
+        resp = requests.post(
+            url,
+            params=params,
+            headers=headers,
+            json=payload,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("err_no") == 0
+    except Exception as e:
+        print(f"❌ 评论沸点失败 {msg_id}: {e}")
+        return False

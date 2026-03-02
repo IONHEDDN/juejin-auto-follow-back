@@ -1,0 +1,30 @@
+name: 每日发沸点（大号）
+
+on:
+  schedule:
+    # 每天早上 8:15 北京时间 = 0:15 UTC
+    - cron: '15 0 * * *'
+    # 每天早上 9:20 北京时间 = 1:20 UTC
+    - cron: '20 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install requests
+
+      - name: 执行发沸点（推荐第 6 条内容 + ...）
+        run: python scripts/daily_publish_short_msg.py
+        env:
+          PYTHONUNBUFFERED: '1'
+          JUEJIN_COOKIES: ${{ secrets.JUEJIN_COOKIES }}
