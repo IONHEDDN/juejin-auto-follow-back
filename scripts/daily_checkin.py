@@ -64,46 +64,77 @@ class JuejinCheckIn:
                 cookies_dict[key.strip()] = value.strip()
         return cookies_dict
     
-    def check_in(self):
-        """执行签到"""
-        # 写死 msToken 和 a_bogus（如果过期需要更新）
-        ms_token = 'tL7rsgQWGYO3CH0mU-ZoYmHoZ353IbUWQDWMiEo2Uyqy_LSq5FkKxphp-u47lcdi4repIAK7CPCvT6ZDLx8FEsZW9WtsuEg2a9YvZk6TM_uX7GNKdjv4ZJ-yZjrcWqh0kw=='
-        a_bogus = 'Y7sDXcgLMsm1uj3%2FWwDz9rkmLqE0YW5UgZEzULzzcUL6'
+#     def check_in(self):
+#         """执行签到"""
+#         # 写死 msToken 和 a_bogus（如果过期需要更新）
+#         ms_token = 'tL7rsgQWGYO3CH0mU-ZoYmHoZ353IbUWQDWMiEo2Uyqy_LSq5FkKxphp-u47lcdi4repIAK7CPCvT6ZDLx8FEsZW9WtsuEg2a9YvZk6TM_uX7GNKdjv4ZJ-yZjrcWqh0kw=='
+#         a_bogus = 'Y7sDXcgLMsm1uj3%2FWwDz9rkmLqE0YW5UgZEzULzzcUL6'
         
+#         url = f"{self.base_url}/growth_api/v1/check_in"
+#         params = {
+#             'aid': '2608',
+#             'uuid': self.uuid,
+#             'spider': '0',
+#             'msToken': ms_token,
+#             'a_bogus': a_bogus
+#         }
+        
+#         try:
+#             response = self.session.post(
+#                 url,
+#                 params=params,
+#                 headers=self.headers,
+#                 data='{}',
+#                 timeout=10
+#             )
+            
+#             response.raise_for_status()
+#             print(f"DEBUG: Status Code: {response.status_code}")
+# # 如果返回 403，说明签名 (a_bogus) 错误
+# # 如果返回 200 但内容为空，说明 Cookie 无效或被反爬
+#             if not response.text or response.text.strip() == '':
+#                 print(f"❌ [{self.account_name}] API 返回空响应 - Cookie 可能已过期")
+#                 return None
+            
+#             result = response.json()
+#             return result
+#         except json.JSONDecodeError as e:
+#             print(f"❌ [{self.account_name}] JSON 解析失败: {e}")
+#             return None
+#         except Exception as e:
+#             print(f"❌ [{self.account_name}] 签到失败: {e}")
+#             return None
+    def check_in(self):
+        """执行签到 - 极简绕过模式"""
+        # 移除硬编码的过期 token，改为空或短 token 尝试绕过
         url = f"{self.base_url}/growth_api/v1/check_in"
         params = {
             'aid': '2608',
             'uuid': self.uuid,
-            'spider': '0',
-            'msToken': ms_token,
-            'a_bogus': a_bogus
+            'spider': '0'
         }
         
         try:
+            # 关键：payload 必须是空 JSON 对象字符串
             response = self.session.post(
                 url,
                 params=params,
                 headers=self.headers,
-                data='{}',
+                data='{}', 
                 timeout=10
             )
             
-            response.raise_for_status()
-            print(f"DEBUG: Status Code: {response.status_code}")
-# 如果返回 403，说明签名 (a_bogus) 错误
-# 如果返回 200 但内容为空，说明 Cookie 无效或被反爬
-            if not response.text or response.text.strip() == '':
-                print(f"❌ [{self.account_name}] API 返回空响应 - Cookie 可能已过期")
-                return None
+            print(f"DEBUG: HTTP Status: {response.status_code}")
             
-            result = response.json()
-            return result
-        except json.JSONDecodeError as e:
-            print(f"❌ [{self.account_name}] JSON 解析失败: {e}")
-            return None
+            if not response.text:
+                print(f"❌ [{self.account_name}] 收到完全空的响应。")
+                return None
+                
+            return response.json()
         except Exception as e:
-            print(f"❌ [{self.account_name}] 签到失败: {e}")
+            print(f"❌ [{self.account_name}] 请求异常: {e}")
             return None
+
     
     def get_current_point(self):
         """获取当前矿石数"""
